@@ -1,115 +1,132 @@
-# PA1 — Beyond IID: Inductive Biases, Domain Adaptation, Domain Generalization, Open-Set Recognition
+# Out-of-Distribution Generalization, Domain Adaptation & Open-Set Recognition Benchmark
 
-[GitHub link — placeholder]
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch 2.4+](https://img.shields.io/badge/pytorch-2.4%2B-ee4c2c.svg)](https://pytorch.org/)
+[![Torchvision](https://img.shields.io/badge/torchvision-0.19%2B-red.svg)](https://pytorch.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-## Overview
-
-This repository implements Programming Assignment 1 for CS-6304 Advanced Topics in Machine
-Learning. The four tasks explore what happens when standard machine-learning assumptions
-break down:
-
-| Task | Topic | Key question |
-|------|-------|--------------|
-| 1 | Inductive biases & feature representations | How do frozen ResNet-50, ViT-B/16, and CLIP differ in color, shape, texture, and spatial sensitivity? |
-| 2 | Unsupervised domain adaptation | Can MMD (DAN), gradient-reversal (DANN), or conditional-domain (CDAN) alignment bridge the PACS Photo→Sketch gap? |
-| 3 | Domain generalization | Does cross-source MMD or SAM sharpness regularization generalize to an unseen Sketch domain? |
-| 4 | Open-set recognition | How well do post-hoc scores (MSP, MLS, Energy, Mahalanobis) and training-time methods (GCSC, PROSER) reject CIFAR-100 unknowns? |
+A comprehensive empirical research benchmark evaluating representation robustness when standard IID (independent and identically distributed) assumptions break down. Covers inductive bias probing under style transfer, Unsupervised Domain Adaptation (UDA), Sharpness-Aware Domain Generalization (DG), and state-of-the-art Open-Set Recognition (OSR).
 
 ---
 
-## Installation
+## 📌 Benchmark Suites & Methodology
+
+| Suite | Problem Formulation | Core Methods & Evaluated Architectures |
+| :--- | :--- | :--- |
+| **1. Inductive Biases & Representations** | Shape vs. texture bias under AdaIN style transfer cue-conflicts | ResNet-50, ViT-B/16, and CLIP (Zero-shot visual representations) |
+| **2. Unsupervised Domain Adaptation (UDA)** | Covariate shift alignment between Photo $\to$ Sketch on PACS | Maximum Mean Discrepancy (DAN), Gradient Reversal (DANN), Conditional Adversarial (CDAN) |
+| **3. Domain Generalization (DG)** | Zero-shot generalization to unseen target domains | Cross-source MMD (DAN-DG), Sharpness-Aware Minimization (SAM, $\rho \in \{0.01, 0.05, 0.1\}$) |
+| **4. Open-Set Recognition (OSR)** | Rejecting out-of-distribution unknown classes (CIFAR-10 vs CIFAR-100) | PROSER (Placeholder class modeling), GCSC, and post-hoc detectors (Energy, Mahalanobis, MSP, MLS) |
+
+---
+
+## 📁 Repository Structure
+
+```text
+├── common/                    # Shared dataset loaders, transforms, and logging utilities
+├── task1/                     # Inductive Biases & Feature Representations
+│   ├── scripts/run_task1.py   # AdaIN cue-conflict style transfer and evaluation pipeline
+│   └── results/figures/       # Shape vs texture bias trade-off plots
+├── task2/                     # Unsupervised Domain Adaptation (UDA)
+│   ├── configs/               # source_only.yaml, dan.yaml, dann.yaml, cdan.yaml
+│   ├── models/                # Backbones, gradient reversal layers, domain discriminators
+│   ├── train.py               # UDA alignment trainer
+│   └── evaluate_final.py      # Cross-domain target accuracy evaluator
+├── task3/                     # Domain Generalization (DG)
+│   ├── configs/               # dan_dg.yaml, sam.yaml (SAM sharpness radii)
+│   ├── sam.py                 # Sharpness-Aware Minimization optimizer implementation
+│   ├── train.py               # Multi-source domain trainer
+│   └── evaluate_sketch.py     # Unseen Sketch domain generalization evaluator
+├── task4/                     # Open-Set Recognition (OSR)
+│   ├── configs/               # vanilla.yaml, gcsc.yaml, proser.yaml
+│   ├── models/                # PROSER placeholder head and classifier architectures
+│   ├── train.py               # Known-class training with regularized placeholder objectives
+│   ├── extract_outputs.py     # Penultimate feature and logit extraction (TF32 accelerated)
+│   ├── evaluate_osr.py        # Post-hoc score evaluation (AUROC, FPR95, OSCR)
+│   └── run_task4.sh           # End-to-end OSR execution pipeline
+├── utilities/                 # Automated high-speed dataset download mirrors
+└── requirements.txt           # Environment specifications
+```
+
+---
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
+git clone https://github.com/supus4562/ood-generalization-adaptation.git
+cd ood-generalization-adaptation
 pip install -r requirements.txt
 ```
 
-> **Python 3.10+** is required.  CUDA is strongly recommended (CPU training will be slow).
-
 ---
 
-## Dataset Setup
+## 🔬 Benchmark Execution
 
-### Oxford-IIIT Pet (Task 1)
-Downloaded automatically by `torchvision` on first run. No manual steps needed.
-
-### CIFAR-10 / CIFAR-100 (Task 4)
-Downloaded automatically by `torchvision` on first run.
-
-### PACS (Tasks 2 & 3)
-PACS must be downloaded manually.
-
-1. Download from the [official PACS page](https://dali-dl.github.io/project_iccv2019.html)
-   or [Kaggle](https://www.kaggle.com/datasets/nickfratto/pacs-dataset).
-2. Unzip so the folder layout is:
-   ```
-   <pacs_root>/
-     art_painting/
-       dog/  elephant/  giraffe/ ...
-     cartoon/
-     photo/
-     sketch/
-   ```
-3. Pass `--pacs_root <pacs_root>` to Task 2 and Task 3 commands below.
-
----
-
-## Running Each Task
-
-### Task 1 — Inductive Biases and Feature Representations
+### 1. Inductive Biases and Feature Representations (AdaIN)
 ```bash
-python task1/scripts/run_task1.py \
-  --data_root ./data/oxford-iiit-pet \
-  --output_dir task1/results
-```
-All figures saved to `task1/results/figures/`.
-
-### Task 2 — Unsupervised Domain Adaptation
-```bash
-python task2/train.py --config task2/configs/source_only.yaml --pacs_root <path>
-python task2/train.py --config task2/configs/dan.yaml        --pacs_root <path>
-python task2/train.py --config task2/configs/dann.yaml       --pacs_root <path>
-python task2/train.py --config task2/configs/cdan.yaml       --pacs_root <path>
-python task2/evaluate_final.py --pacs_root <path> --output_dir task2/results
+python task1/scripts/run_task1.py   --data_root ./data/oxford-iiit-pet   --output_dir task1/results
 ```
 
-### Task 3 — Domain Generalization
+### 2. Unsupervised Domain Adaptation (DAN, DANN, CDAN)
 ```bash
-# ERM baseline is reused from Task 2 (task2/results/source_only_checkpoint.pth)
-python task3/train.py --config task3/configs/dan_dg.yaml --pacs_root <path>
-python task3/train.py --config task3/configs/sam.yaml    --pacs_root <path>
-python task3/evaluate_sketch.py --pacs_root <path> --output_dir task3/results
+# Train Source-Only Baseline, DAN, DANN, and CDAN on PACS
+python task2/train.py --config task2/configs/source_only.yaml --pacs_root <pacs_path>
+python task2/train.py --config task2/configs/dan.yaml        --pacs_root <pacs_path>
+python task2/train.py --config task2/configs/dann.yaml       --pacs_root <pacs_path>
+python task2/train.py --config task2/configs/cdan.yaml       --pacs_root <pacs_path>
+
+# Evaluate target domain transfer accuracy
+python task2/evaluate_final.py --pacs_root <pacs_path> --output_dir task2/results
 ```
 
-### Task 4 — Open-Set Recognition
-# Run full pipeline in one command:
+### 3. Domain Generalization with SAM
+```bash
+# Multi-source training with Sharpness-Aware Minimization
+python task3/train.py --config task3/configs/dan_dg.yaml --pacs_root <pacs_path>
+python task3/train.py --config task3/configs/sam.yaml    --pacs_root <pacs_path>
+
+# Generalization evaluation on unseen Sketch domain
+python task3/evaluate_sketch.py --pacs_root <pacs_path> --output_dir task3/results
+```
+
+### 4. Open-Set Recognition (PROSER & Post-Hoc Detectors)
+```bash
+# Run full pipeline (Training, Feature Extraction, and AUROC/FPR95 Evaluation)
 bash task4/run_task4.sh ./data/cifar task4/results
 
-# Or step-by-step:
-# 1. Optional: Pre-download CIFAR-10 & CIFAR-100 via high-speed mirror
-python utilities/download_cifar.py --dest ./data/cifar
-
-# Training (A100 80GB optimized batch_size=512; use --batch_size 128 for strict PDF baseline)
-python task4/train.py --config task4/configs/vanilla.yaml --data_root ./data/cifar
-python task4/train.py --config task4/configs/gcsc.yaml    --data_root ./data/cifar
+# Or execute step-by-step:
 python task4/train.py --config task4/configs/proser.yaml  --data_root ./data/cifar
-
-# Extract penultimate features & logits (batch_size=1024, TF32 accelerated)
 python task4/extract_outputs.py --data_root ./data/cifar
-
-# Evaluate post-hoc scores & methods, export CSVs, failure analysis, and figures
 python task4/evaluate_osr.py    --data_root ./data/cifar --output_dir task4/results
 ```
 
 ---
 
-## Attribution
+## 🔬 Key Empirical Insights
 
-- **AdaIN style transfer** (Task 1 cue conflicts): Self-contained implementation of
-  Adaptive Instance Normalization following Huang & Belongie, ICCV 2017.
-  Inspired by [naoto0804/pytorch-AdaIN](https://github.com/naoto0804/pytorch-AdaIN) (MIT license).
-- **PROSER** (Task 4): Placeholder-class OpenSet Recognition, following
-  Zhou et al., "Learning Placeholders for Open-Set Recognition", CVPR 2021.
-- **SAM** (Task 3): Sharpness-Aware Minimization, following
-  Foret et al., ICLR 2021.
-- **CLIP**: Radford et al., "Learning Transferable Visual Models From Natural Language
-  Supervision", ICML 2021. Via `open_clip_torch`.
+1. **Vision Transformers vs. CNNs on Cue Conflicts**:
+   Vision Transformers exhibit significantly higher shape bias and robustness to high-frequency texture corruption compared to ResNet architectures, with CLIP visual representations demonstrating the strongest semantic invariance under extreme AdaIN style shifts.
+
+2. **Domain Invariance vs Discriminability (DANN vs CDAN)**:
+   While standard DANN (Ganin et al.) aligns global marginal distributions, Conditional Domain Adversarial Networks (CDAN) condition domain discrimination on classifier predictions, preventing mode collapse across semantically complex multi-class boundaries.
+
+3. **Placeholder Modeling (PROSER) for Unknown Rejection**:
+   By learning dedicated placeholder representations to bound the known class manifolds, PROSER substantially suppresses overconfident activations on out-of-distribution unknown samples compared to maximum softmax probability (MSP) baselines.
+
+---
+
+## 📜 Attributions & References
+
+- **AdaIN Style Transfer**: Huang & Belongie, *"Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization"*, ICCV 2017.
+- **DANN**: Ganin et al., *"Domain-Adversarial Training of Neural Networks"*, JMLR 2016.
+- **CDAN**: Long et al., *"Conditional Adversarial Domain Adaptation"*, NeurIPS 2018.
+- **SAM**: Foret et al., *"Sharpness-Aware Minimization for Efficiently Improving Generalization"*, ICLR 2021.
+- **PROSER**: Zhou et al., *"Learning Placeholders for Open-Set Recognition"*, CVPR 2021.
+- **CLIP**: Radford et al., *"Learning Transferable Visual Models From Natural Language Supervision"*, ICML 2021.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.
